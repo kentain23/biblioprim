@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BiblioPrim — Gestion des séries de livres</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- Quagga2 for barcode scanning -->
+<script src="https://unpkg.com/@ericblade/quagga2/dist/quagga.min.js"></script>
+<style>
+  :root {
+    --primary: #2BBF7A;
+    --primary-light: #E8FAF2;
+    --primary-dark: #1A8A55;
+    --secondary: #F97B5A;
+    --secondary-light: #FEF0EB;
+    --green: #2BBF7A;
+    --green-light: #E8FAF2;
+    --amber: #F5A623;
+    --amber-light: #FEF7E8;
+    --red: #E84F4F;
+    --red-light: #FEF0F0;
+    --purple: #9B6BF2;
+    --purple-light: #F4EFFE;
+    --bg: #F4FBF7;
+    --bg-card: #FFFFFF;
+    --text: #1A2E24;
+    --text-secondary: #5A7A68;
+    --border: #D4EDE1;
+    --shadow: 0 2px 12px rgba(43,191,122,0.08);
+    --shadow-hover: 0 6px 24px rgba(43,191,122,0.18);
+    --radius: 16px;
+    --radius-sm: 10px;
+    --font-main: 'Nunito', sans-serif;
+    --font-display: 'Quicksand', sans-serif;
+  }
+  [data-theme="dark"] {
+    --bg: #0F1F17; --bg-card: #172B1F; --text: #E8F5EE;
+    --text-secondary: #7AAD8E; --border: #1E3D2C;
+    --shadow: 0 2px 12px rgba(0,0,0,0.3); --shadow-hover: 0 6px 24px rgba(0,0,0,0.4);
+    --primary-light: #0F2C1E; --green-light: #0F2C1E;
+    --amber-light: #2C2010; --red-light: #2C1212;
+    --purple-light: #22153A; --secondary-light: #2C1A12;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-main); background: var(--bg); color: var(--text); min-height: 100vh; transition: background 0.3s, color 0.3s; }
+  .app-layout { display: flex; flex-direction: column; min-height: 100vh; }
+
+  /* TOP NAV */
+  .topnav { background: var(--bg-card); border-bottom: 1px solid var(--border); box-shadow: 0 2px 16px rgba(43,191,122,0.08); position: sticky; top: 0; z-index: 100; display: flex; align-items: center; padding: 0 24px; height: 62px; gap: 8px; }
+  .topnav-logo { display: flex; align-items: center; gap: 10px; margin-right: 20px; }
+  .logo-icon { width: 36px; height: 36px; background: var(--primary); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .logo-title { font-family: var(--font-display); font-size: 19px; font-weight: 700; color: var(--primary); white-space: nowrap; }
+  .topnav-items { display: flex; align-items: center; gap: 2px; flex: 1; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: var(--radius-sm); cursor: pointer; transition: all 0.2s; font-size: 14px; font-weight: 700; color: var(--text-secondary); white-space: nowrap; border: none; background: none; font-family: var(--font-main); }
+  .nav-item:hover { background: var(--primary-light); color: var(--primary); }
+  .nav-item.active { background: var(--primary); color: white; }
+  .nav-badge { background: var(--secondary); color: white; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 20px; }
+  .nav-item.active .nav-badge { background: rgba(255,255,255,0.35); }
+  .topnav-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .theme-toggle { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-secondary); transition: all 0.2s; border: 1.5px solid var(--border); background: none; font-family: var(--font-main); }
+  .theme-toggle:hover { background: var(--primary-light); color: var(--primary); border-color: var(--primary); }
+
+  .main-content { flex: 1; padding: 28px 32px; overflow-x: hidden; max-width: 1400px; width: 100%; margin: 0 auto; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; gap: 16px; flex-wrap: wrap; }
+  .page-title { font-size: 26px; font-weight: 800; font-family: var(--font-display); }
+  .page-subtitle { font-size: 14px; color: var(--text-secondary); margin-top: 2px; }
+  .card { background: var(--bg-card); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow); padding: 24px; }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px,1fr)); gap: 16px; margin-bottom: 28px; }
+  .stat-card { background: var(--bg-card); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow); padding: 20px; transition: all 0.2s; }
+  .stat-card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
+  .stat-icon { width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; margin-bottom: 14px; }
+  .stat-number { font-size: 30px; font-weight: 900; font-family: var(--font-display); line-height: 1; }
+  .stat-label { font-size: 13px; color: var(--text-secondary); font-weight: 600; margin-top: 4px; }
+
+  /* BUTTONS */
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 20px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 700; cursor: pointer; border: none; transition: all 0.2s; font-family: var(--font-main); text-decoration: none; }
+  .btn:hover { transform: translateY(-1px); } .btn:active { transform: scale(0.98); }
+  .btn-primary { background: var(--primary); color: white; box-shadow: 0 4px 14px rgba(43,191,122,0.35); }
+  .btn-primary:hover { background: var(--primary-dark); }
+  .btn-secondary { background: var(--secondary); color: white; box-shadow: 0 4px 14px rgba(249,123,90,0.35); }
+  .btn-danger { background: var(--red); color: white; }
+  .btn-danger:hover { background: #c03030; }
+  .btn-outline { background: var(--bg-card); color: var(--text); border: 1.5px solid var(--border); box-shadow: var(--shadow); }
+  .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+  .btn-sm { padding: 7px 14px; font-size: 13px; }
+  .btn-icon { padding: 9px; border-radius: 10px; }
+
+  /* BADGES */
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+  .badge-green { background: var(--green-light); color: #1A7A4A; }
+  .badge-red { background: var(--red-light); color: #C03030; }
+  .badge-amber { background: var(--amber-light); color: #B07010; }
+  .badge-blue { background: var(--primary-light); color: var(--primary-dark); }
+  .badge-gray { background: var(--border); color: var(--text-secondary); }
+
+  /* SEARCH */
+  .search-input-wrap { position: relative; flex: 1; min-width: 200px; }
+  .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); font-size: 16px; }
+  .search-input { width: 100%; padding: 11px 14px 11px 42px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; font-family: var(--font-main); background: var(--bg-card); color: var(--text); transition: border-color 0.2s; }
+  .search-input:focus { outline: none; border-color: var(--primary); }
+  .filter-chip { padding: 7px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; cursor: pointer; border: 1.5px solid var(--border); background: var(--bg-card); color: var(--text-secondary); transition: all 0.2s; }
+  .filter-chip:hover { border-color: var(--primary); color: var(--primary); }
+  .filter-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
+  .filter-chip.active-green { background: var(--green); color: white; border-color: var(--green); }
+  .filter-chip.active-red { background: var(--red); color: white; border-color: var(--red); }
+
+  /* BOOK CARDS */
+  .books-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
+  .book-card { background: var(--bg-card); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; transition: all 0.25s; display: flex; flex-direction: column; }
+  .book-card:hover { box-shadow: var(--shadow-hover); transform: translateY(-3px); }
+  .book-cover { height: 140px; background: linear-gradient(135deg, var(--primary-light), var(--border)); display: flex; align-items: center; justify-content: center; font-size: 50px; position: relative; overflow: hidden; }
+  .book-cover img { width: 100%; height: 100%; object-fit: cover; }
+  .book-cover-overlay { position: absolute; top: 10px; right: 10px; }
+  .book-cover-delete { position: absolute; top: 10px; left: 10px; }
+  .delete-btn-card { width: 28px; height: 28px; border-radius: 8px; border: none; background: rgba(232,79,79,0.15); color: var(--red); font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+  .delete-btn-card:hover { background: var(--red); color: white; }
+  .book-body { padding: 16px; flex: 1; display: flex; flex-direction: column; }
+  .book-title { font-size: 15px; font-weight: 800; line-height: 1.3; margin-bottom: 4px; }
+  .book-author { font-size: 13px; color: var(--text-secondary); font-weight: 600; margin-bottom: 4px; }
+  .book-lieu { font-size: 12px; color: var(--primary-dark); font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 4px; }
+  .book-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .book-footer { display: flex; gap: 8px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); align-items: center; }
+  .book-exemplaires { font-size: 12px; font-weight: 700; color: var(--text-secondary); }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(15,31,23,0.55); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; animation: fadeIn 0.2s ease; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  .modal { background: var(--bg-card); border-radius: var(--radius); box-shadow: 0 20px 60px rgba(15,31,23,0.25); padding: 32px; width: 100%; max-width: 620px; max-height: 90vh; overflow-y: auto; animation: slideUp 0.25s ease; }
+  .modal-lg { max-width: 760px; }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .modal-title { font-size: 20px; font-weight: 800; font-family: var(--font-display); }
+  .modal-close { width: 36px; height: 36px; border-radius: 10px; border: 1.5px solid var(--border); background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; color: var(--text-secondary); transition: all 0.2s; }
+  .modal-close:hover { background: var(--red-light); color: var(--red); border-color: var(--red); }
+
+  /* FORMS */
+  .form-group { margin-bottom: 18px; }
+  .form-label { display: block; font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; }
+  .form-input, .form-select, .form-textarea { width: 100%; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; font-family: var(--font-main); background: var(--bg-card); color: var(--text); transition: border-color 0.2s; }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(43,191,122,0.15); }
+  .form-textarea { resize: vertical; min-height: 80px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+
+  /* BARCODE */
+  .isbn-lookup-box { background: var(--primary-light); border: 2px solid var(--primary); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 20px; }
+  .isbn-row { display: flex; gap: 10px; align-items: flex-end; }
+  .isbn-row .form-input { flex: 1; }
+  .book-preview { display: flex; gap: 14px; padding: 12px; background: var(--bg-card); border-radius: 10px; margin-top: 12px; border: 1px solid var(--border); }
+  .book-preview img { width: 60px; height: 80px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+  .book-preview-emoji { width: 60px; height: 80px; background: var(--primary-light); border-radius: 6px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 30px; }
+  .book-preview-info { flex: 1; }
+  .book-preview-title { font-weight: 800; font-size: 14px; margin-bottom: 3px; }
+  .book-preview-author { font-size: 13px; color: var(--text-secondary); }
+  .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* SCANNER */
+  .scanner-box { position: relative; width: 100%; max-width: 400px; margin: 0 auto; border-radius: 12px; overflow: hidden; background: #000; }
+  .scanner-box video { width: 100%; display: block; }
+  .scanner-line { position: absolute; left: 10%; right: 10%; height: 2px; background: var(--primary); top: 50%; animation: scanLine 1.5s ease-in-out infinite; box-shadow: 0 0 8px var(--primary); }
+  @keyframes scanLine { 0%,100% { top: 25%; } 50% { top: 75%; } }
+  #scanner-viewport canvas, #scanner-viewport video { width: 100% !important; height: auto !important; border-radius: 12px; }
+
+  /* TEACHERS */
+  .teachers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+  .teacher-card { background: var(--bg-card); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow); padding: 20px; transition: all 0.25s; }
+  .teacher-card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
+  .teacher-avatar { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 800; color: white; margin-bottom: 12px; }
+  .teacher-name { font-size: 16px; font-weight: 800; margin-bottom: 2px; }
+  .teacher-meta { font-size: 13px; color: var(--text-secondary); font-weight: 600; margin-bottom: 14px; }
+  .teacher-book-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg); border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 6px; }
+
+  /* TABLE */
+  .table-wrap { overflow-x: auto; }
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th { padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 800; color: var(--text-secondary); letter-spacing: 0.8px; text-transform: uppercase; border-bottom: 2px solid var(--border); white-space: nowrap; }
+  .data-table td { padding: 14px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: var(--primary-light); }
+
+  /* ALERTS */
+  .alert { padding: 14px 18px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .alert-warning { background: var(--amber-light); color: #8B6010; border-left: 4px solid var(--amber); }
+  .alert-info { background: var(--primary-light); color: var(--primary-dark); border-left: 4px solid var(--primary); }
+
+  /* DETAIL */
+  .detail-grid { display: grid; grid-template-columns: minmax(140px, 200px) 1fr; gap: 24px; }
+  .detail-cover { background: var(--primary-light); border-radius: var(--radius); aspect-ratio: 3/4; display: flex; align-items: center; justify-content: center; font-size: 70px; overflow: hidden; }
+  .detail-cover img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* BAR CHART */
+  .bar-chart { display: flex; flex-direction: column; gap: 12px; }
+  .bar-row { display: flex; align-items: center; gap: 12px; }
+  .bar-label { font-size: 13px; font-weight: 600; width: 140px; text-align: right; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-track { flex: 1; height: 26px; background: var(--bg); border-radius: 8px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 8px; display: flex; align-items: center; padding: 0 10px; font-size: 12px; font-weight: 700; color: white; transition: width 0.8s ease; min-width: 30px; }
+  .bar-count { font-size: 13px; font-weight: 700; color: var(--text-secondary); width: 24px; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+  .empty-state .empty-icon { font-size: 60px; margin-bottom: 16px; }
+  .empty-state h3 { font-size: 18px; font-weight: 800; color: var(--text); margin-bottom: 8px; }
+
+  .history-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .history-item:last-child { border-bottom: none; }
+  .history-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  /* TABS */
+  .tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--border); margin-bottom: 24px; }
+  .tab { padding: 10px 20px; font-size: 14px; font-weight: 700; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--text-secondary); transition: all 0.2s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+  /* CYCLE COLORS */
+  .cycle-c1 { background: #EFF6FF; color: #1D4ED8; }
+  .cycle-c2 { background: #FFF7ED; color: #C2410C; }
+  .cycle-c3 { background: #F0FDF4; color: #15803D; }
+
+  /* FILE INPUT */
+  .file-input-wrap { border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--bg); }
+  .file-input-wrap:hover { border-color: var(--primary); background: var(--primary-light); }
+  .file-input-wrap input { display: none; }
+
+  /* TOAST */
+  .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+  .toast { background: var(--text); color: var(--bg-card); padding: 12px 18px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); animation: slideUp 0.3s ease; max-width: 320px; }
+  .toast.success { background: var(--green); color: white; }
+  .toast.error { background: var(--red); color: white; }
+  .toast.warning { background: var(--amber); color: white; }
+
+  /* COLOR PICKER */
+  input[type="color"] { -webkit-appearance: none; appearance: none; border: none; cursor: pointer; }
+  input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; border-radius: 8px; }
+  input[type="color"]::-webkit-color-swatch { border: none; border-radius: 6px; }
+
+  @media (max-width: 768px) {
+    .main-content { padding: 16px; }
+    .detail-grid { grid-template-columns: 1fr; }
+    .form-row { grid-template-columns: 1fr; }
+    .books-grid { grid-template-columns: 1fr 1fr; }
+    .nav-item span:not(.nav-icon):not(.nav-badge) { display: none; }
+    .topnav { padding: 0 12px; }
+    .logo-title { display: none; }
+  }
+  @media (max-width: 520px) { .books-grid { grid-template-columns: 1fr; } }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
+
+// ─── CONSTANTS ───────────────────────────────────────────────
+const CYCLES = ['Cycle 1','Cycle 2','Cycle 3'];
+const NIVEAUX = ['PS','MS','GS','CP','CE1','CE2','CM1','CM2'];
+const COLORS_TEACHER = ['#2BBF7A','#F97B5A','#9B6BF2','#F5A623','#E84F4F','#20C4D8','#E84FA3','#3B82F6'];
+const CYCLE_EMOJI = {'Cycle 1':'🌱','Cycle 2':'📘','Cycle 3':'🎓'};
+const COVER_EMOJIS = ['📚','📖','📕','📗','📘','📙','🎒','✏️','🦋','🌈','🦄','🐸'];
+
+const SAMPLE_SERIES = [
+  {id:'s1',titre:'Les Incollables',auteur:'Play Bac',couverture:'',isbn:'',exemplaires:5,cycle:'Cycle 2',niveaux:['CE1','CE2'],notes:'Très appréciée',lieu:'Bibliothèque - Étagère A2',disponible:true},
+  {id:'s2',titre:'Charlotte aux fraises',auteur:'Agnès Bertron-Martin',couverture:'',isbn:'',exemplaires:3,cycle:'Cycle 1',niveaux:['PS','MS'],notes:'',lieu:'Salle maternelle - Armoire bleue',disponible:false},
+  {id:'s3',titre:'Le Loup qui voulait être un mouton',auteur:'Orianne Lallemand',couverture:'',isbn:'',exemplaires:4,cycle:'Cycle 2',niveaux:['CP'],notes:'Parfait pour la rentrée',lieu:'Bibliothèque - Étagère B1',disponible:true},
+];
+const SAMPLE_ENSEIGNANTS = [
+  {id:'e1',nom:'Marie Dupont',classe:'CE2',couleur:'#2BBF7A'},
+  {id:'e2',nom:'Pierre Martin',classe:'CM1',couleur:'#F97B5A'},
+  {id:'e3',nom:'Sophie Bernard',classe:'GS',couleur:'#9B6BF2'},
+];
+const SAMPLE_EMPRUNTS = [
+  {id:'b1',serieId:'s2',enseignantId:'e3',dateRetourPrevue:'2025-02-10',dateRetourReelle:null,statut:'actif'},
+  {id:'b2',serieId:'s1',enseignantId:'e2',dateRetourPrevue:'2025-01-01',dateRetourReelle:'2025-01-05',statut:'rendu'},
+];
+const DEFAULT_THEME = {primary:'#2BBF7A',secondary:'#F97B5A',btnText:'#ffffff',text:'#1A2E24',bg:'#F4FBF7'};
+
+// ─── AUTH (password hashed — never shown) ────────────────────
+const _h = (s)=>s.split('').reduce((h,c)=>(Math.imul(31,h)+c.charCodeAt(0))|0,0x9e3779b9).toString(16);
+const _ADMIN = _h('abcd1234');
+
+// ─── HELPERS ─────────────────────────────────────────────────
+function useLocalStorage(key, init) {
+  const [val, setVal] = useState(()=>{try{const s=localStorage.getItem(key);return s?JSON.parse(s):init;}catch{return init;}});
+  useEffect(()=>{try{localStorage.setItem(key,JSON.stringify(val));}catch{}}, [key,val]);
+  return [val,setVal];
+}
+const uid = ()=>'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+const formatDate = d=>d?new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}):'—';
+const isLate = d=>d&&new Date(d)<new Date();
+const initials = n=>n.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+const cycleBadgeClass = c=>c==='Cycle 1'?'cycle-c1':c==='Cycle 2'?'cycle-c2':'cycle-c3';
+const coverEmoji = id=>COVER_EMOJIS[id.split('').reduce((a,c)=>a+c.charCodeAt(0),0)%COVER_EMOJIS.length];
+
+// ─── THEME ENGINE ─────────────────────────────────────────────
+function hexToRgb(hex){const r=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);return r?`${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}`:'0,0,0';}
+function lighten(hex,p){const r=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);if(!r)return hex;const m=v=>Math.round(v+(255-v)*p).toString(16).padStart(2,'0');return`#${m(parseInt(r[1],16))}${m(parseInt(r[2],16))}${m(parseInt(r[3],16))}`;}
+function darken(hex,p){const r=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);if(!r)return hex;const m=v=>Math.round(v*(1-p)).toString(16).padStart(2,'0');return`#${m(parseInt(r[1],16))}${m(parseInt(r[2],16))}${m(parseInt(r[3],16))}`;}
+function applyTheme(c){
+  const r=document.documentElement;
+  r.style.setProperty('--primary',c.primary);r.style.setProperty('--primary-light',lighten(c.primary,.88));r.style.setProperty('--primary-dark',darken(c.primary,.28));
+  r.style.setProperty('--green',c.primary);r.style.setProperty('--green-light',lighten(c.primary,.88));
+  r.style.setProperty('--secondary',c.secondary);r.style.setProperty('--secondary-light',lighten(c.secondary,.88));
+  r.style.setProperty('--text',c.text);r.style.setProperty('--text-secondary',lighten(c.text,.45));
+  r.style.setProperty('--bg',c.bg);r.style.setProperty('--bg-card',lighten(c.bg,.85));
+  r.style.setProperty('--border',lighten(c.primary,.72));
+  r.style.setProperty('--shadow',`0 2px 12px rgba(${hexToRgb(c.primary)},.10)`);
+  r.style.setProperty('--shadow-hover',`0 6px 24px rgba(${hexToRgb(c.primary)},.20)`);
+  let s=document.getElementById('_dyn');if(!s){s=document.createElement('style');s.id='_dyn';document.head.appendChild(s);}
+  s.textContent=`.btn-primary{color:${c.btnText}!important}.nav-item.active{color:${c.btnText}!important}`;
+}
+
+// ─── OPEN LIBRARY ISBN LOOKUP ─────────────────────────────────
+async function fetchBookByISBN(isbn) {
+  const clean = isbn.replace(/[^0-9X]/gi,'');
+  // Try Open Library Books API first
+  const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${clean}&format=json&jscmd=data`);
+  const data = await res.json();
+  const key = `ISBN:${clean}`;
+  if (data[key]) {
+    const b = data[key];
+    const cover = b.cover?.large || b.cover?.medium || b.cover?.small || null;
+    return {
+      titre: b.title || '',
+      auteur: b.authors ? b.authors.map(a=>a.name).join(', ') : '',
+      couverture: cover,
+      isbn: clean,
+    };
+  }
+  // Fallback: Open Library Search API
+  const res2 = await fetch(`https://openlibrary.org/search.json?isbn=${clean}&limit=1`);
+  const data2 = await res2.json();
+  if (data2.docs && data2.docs.length > 0) {
+    const d = data2.docs[0];
+    const coverId = d.cover_i;
+    return {
+      titre: d.title || '',
+      auteur: d.author_name ? d.author_name.join(', ') : '',
+      couverture: coverId ? `https://covers.openlibrary.org/b/id/${coverId}-L.jpg` : null,
+      isbn: clean,
+    };
+  }
+  return null;
+}
+
+// ─── TOAST ────────────────────────────────────────────────────
+function ToastContainer({toasts,onDismiss}){
+  return <div className="toast-container">{toasts.map(t=>(
+    <div key={t.id} className={`toast ${t.type}`} onClick={()=>onDismiss(t.id)}>
+      <span>{t.type==='success'?'✅':t.type==='error'?'❌':'⚠️'}</span>{t.msg}
+    </div>
+  ))}</div>;
+}
+
+// ─── MODAL ────────────────────────────────────────────────────
+function Modal({title,onClose,children,lg}){
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className={`modal${lg?' modal-lg':''}`}>
+        <div className="modal-header">
+          <div className="modal-title">{title}</div>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─── BARCODE SCANNER COMPONENT ────────────────────────────────
+function BarcodeScanner({onDetected, onClose}) {
+  const scannerRef = useRef(null);
+  const [error, setError] = useState('');
+  const [active, setActive] = useState(false);
+
+  useEffect(()=>{
+    if(!window.Quagga){setError("Scanner non disponible.");return;}
+    const el = document.getElementById('scanner-viewport');
+    if(!el) return;
+
+    Quagga.init({
+      inputStream:{
+        type:'LiveStream',
+        target: el,
+        constraints:{facingMode:'environment', width:{min:640}, height:{min:480}},
+      },
+      decoder:{readers:['ean_reader','ean_8_reader','code_128_reader','upc_reader']},
+      locate: true,
+    }, err=>{
+      if(err){setError("Impossible d'accéder à la caméra. Autorisez l'accès et réessayez.");return;}
+      Quagga.start();
+      setActive(true);
+    });
+
+    Quagga.onDetected(result=>{
+      const code = result.codeResult?.code;
+      if(code && code.length >= 8){
+        Quagga.stop();
+        onDetected(code);
+      }
+    });
+
+    return ()=>{ try{Quagga.stop();}catch(e){} };
+  }, []);
+
+  return (
+    <div>
+      {error
+        ? <div style={{padding:20,textAlign:'center',color:'var(--red)',fontWeight:700}}>{error}</div>
+        : <div>
+            <p style={{fontSize:13,color:'var(--text-secondary)',marginBottom:12,textAlign:'center'}}>
+              {active ? '📷 Pointez la caméra sur le code-barres du livre...' : '⏳ Initialisation de la caméra...'}
+            </p>
+            <div className="scanner-box">
+              <div id="scanner-viewport" ref={scannerRef} style={{width:'100%',minHeight:260}} />
+              {active && <div className="scanner-line" />}
+            </div>
+          </div>
+      }
+      <div style={{textAlign:'center',marginTop:16}}>
+        <button className="btn btn-outline" onClick={onClose}>Annuler</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── ISBN LOOKUP BOX ─────────────────────────────────────────
+function ISBNLookup({onBookFound}) {
+  const [isbn, setIsbn] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [err, setErr] = useState('');
+  const [showScanner, setShowScanner] = useState(false);
+
+  const lookup = async (val) => {
+    const code = (val||isbn).trim();
+    if(!code){setErr('Entrez un ISBN.');return;}
+    setLoading(true); setErr(''); setResult(null);
+    try {
+      const book = await fetchBookByISBN(code);
+      if(book){setResult(book);}
+      else{setErr('Livre non trouvé. Remplissez manuellement.');}
+    } catch(e){setErr('Erreur de connexion. Vérifiez Internet.');}
+    finally{setLoading(false);}
+  };
+
+  const handleScan = async (code) => {
+    setShowScanner(false);
+    setIsbn(code);
+    await lookup(code);
+  };
+
+  const handleUse = () => {
+    if(result) onBookFound(result);
+  };
+
+  return (
+    <div className="isbn-lookup-box">
+      <div style={{fontWeight:800,fontSize:14,marginBottom:10,color:'var(--primary-dark)'}}>
+        📱 Recherche automatique par code-barres ISBN
+      </div>
+      <div className="isbn-row">
+        <input
+          className="form-input"
+          value={isbn}
+          onChange={e=>setIsbn(e.target.value)}
+          onKeyDown={e=>e.key==='Enter'&&lookup()}
+          placeholder="Ex: 9782070360024"
+          style={{fontSize:14}}
+        />
+        <button className="btn btn-primary btn-sm" onClick={()=>lookup()} disabled={loading} style={{flexShrink:0}}>
+          {loading ? <span className="spinner"/> : '🔍 Chercher'}
+        </button>
+        <button className="btn btn-outline btn-sm" onClick={()=>setShowScanner(true)} title="Scanner avec la caméra" style={{flexShrink:0}}>
+          📷 Scanner
+        </button>
+      </div>
+      {err && <div style={{marginTop:8,fontSize:13,color:'var(--red)',fontWeight:600}}>❌ {err}</div>}
+
+      {result && (
+        <div className="book-preview">
+          {result.couverture
+            ? <img src={result.couverture} alt="" onError={e=>{e.target.style.display='none';}} />
+            : <div className="book-preview-emoji">📚</div>
+          }
+          <div className="book-preview-info">
+            <div className="book-preview-title">{result.titre}</div>
+            <div className="book-preview-author">✍️ {result.auteur||'Auteur inconnu'}</div>
+            <div style={{fontSize:11,color:'var(--text-secondary)',marginTop:4}}>ISBN : {result.isbn}</div>
+            <button className="btn btn-primary btn-sm" onClick={handleUse} style={{marginTop:10}}>
+              ✅ Utiliser ces informations
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showScanner && (
+        <Modal title="📷 Scanner le code-barres" onClose={()=>setShowScanner(false)}>
+          <BarcodeScanner onDetected={handleScan} onClose={()=>setShowScanner(false)} />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── FORM SERIE ───────────────────────────────────────────────
+function FormSerie({init,onSave,onCancel}) {
+  const [form, setForm] = useState(init||{titre:'',auteur:'',couverture:'',isbn:'',exemplaires:1,cycle:'Cycle 2',niveaux:[],notes:'',lieu:'',disponible:true});
+  const set = (k,v)=>setForm(f=>({...f,[k]:v}));
+  const toggleNiveau = n=>set('niveaux',form.niveaux.includes(n)?form.niveaux.filter(x=>x!==n):[...form.niveaux,n]);
+  const handleImg = e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>set('couverture',ev.target.result);r.readAsDataURL(f);};
+  const valid = form.titre.trim() && form.auteur.trim() && form.exemplaires>0;
+
+  const handleBookFound = (book) => {
+    setForm(f=>({...f,
+      titre: book.titre||f.titre,
+      auteur: book.auteur||f.auteur,
+      couverture: book.couverture||f.couverture,
+      isbn: book.isbn||f.isbn,
+    }));
+  };
+
+  return (
+    <div>
+      {!init && <ISBNLookup onBookFound={handleBookFound} />}
+
+      <div className="form-row">
+        <div className="form-group">
+          <label className="form-label">Titre *</label>
+          <input className="form-input" value={form.titre} onChange={e=>set('titre',e.target.value)} placeholder="Titre de la série..." />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Auteur *</label>
+          <input className="form-input" value={form.auteur} onChange={e=>set('auteur',e.target.value)} placeholder="Nom de l'auteur" />
+        </div>
+      </div>
+      <div className="form-row">
+        <div className="form-group">
+          <label className="form-label">Cycle conseillé *</label>
+          <select className="form-select" value={form.cycle} onChange={e=>set('cycle',e.target.value)}>
+            {CYCLES.map(c=><option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Exemplaires *</label>
+          <input className="form-input" type="number" min="1" value={form.exemplaires} onChange={e=>set('exemplaires',+e.target.value)} />
+        </div>
+      </div>
+      <div className="form-group">
+        <label className="form-label">📍 Lieu de rangement</label>
+        <input className="form-input" value={form.lieu} onChange={e=>set('lieu',e.target.value)} placeholder="Ex : Bibliothèque - Étagère A2..." />
+      </div>
+      <div className="form-group">
+        <label className="form-label">Niveaux conseillés</label>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+          {NIVEAUX.map(n=><button key={n} className={`filter-chip${form.niveaux.includes(n)?' active':''}`} onClick={()=>toggleNiveau(n)} type="button">{n}</button>)}
+        </div>
+      </div>
+      <div className="form-group">
+        <label className="form-label">Photo de couverture</label>
+        {form.couverture
+          ? <div style={{display:'flex',gap:12,alignItems:'center'}}>
+              <img src={form.couverture} alt="" style={{height:80,borderRadius:8,objectFit:'cover'}} onError={e=>e.target.style.display='none'} />
+              <div>
+                <div style={{fontSize:12,color:'var(--text-secondary)',marginBottom:6}}>Couverture récupérée automatiquement ou importée</div>
+                <button className="btn btn-outline btn-sm" onClick={()=>set('couverture','')}>✕ Supprimer</button>
+              </div>
+            </div>
+          : <label className="file-input-wrap">
+              <input type="file" accept="image/*" onChange={handleImg} />
+              <div>📷 <span style={{fontSize:13,color:'var(--text-secondary)'}}>Cliquer pour importer une image</span></div>
+            </label>
+        }
+      </div>
+      <div className="form-group">
+        <label className="form-label">Notes / Remarques</label>
+        <textarea className="form-textarea" value={form.notes} onChange={e=>set('notes',e.target.value)} placeholder="Observations..." />
+      </div>
+      <div className="form-actions">
+        <button className="btn btn-outline" onClick={onCancel}>Annuler</button>
+        <button className="btn btn-primary" onClick={()=>valid&&onSave(form)} disabled={!valid} style={{opacity:valid?1:0.5}}>💾 Enregistrer</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── FORM EMPRUNT ─────────────────────────────────────────────
+function FormEmprunt({series,enseignants,onSave,onCancel,initSerieId}) {
+  const avail = series.filter(s=>s.disponible);
+  const [form,setForm] = useState({
+    serieId:initSerieId||(avail[0]?.id||''),
+    enseignantId:enseignants[0]?.id||'',
+    dateRetourPrevue:new Date(Date.now()+30*24*60*60*1000).toISOString().split('T')[0],
+  });
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const valid=form.serieId&&form.enseignantId&&form.dateRetourPrevue;
+  return (
+    <div>
+      <div className="form-group">
+        <label className="form-label">Série à emprunter *</label>
+        <select className="form-select" value={form.serieId} onChange={e=>set('serieId',e.target.value)}>
+          {avail.length===0?<option value="">Aucune série disponible</option>:avail.map(s=><option key={s.id} value={s.id}>{s.titre} ({s.exemplaires} ex.) — {s.cycle}</option>)}
+        </select>
+      </div>
+      <div className="form-group">
+        <label className="form-label">Enseignant *</label>
+        <select className="form-select" value={form.enseignantId} onChange={e=>set('enseignantId',e.target.value)}>
+          {enseignants.map(e=><option key={e.id} value={e.id}>{e.nom}{e.classe?` — ${e.classe}`:''}</option>)}
+        </select>
+      </div>
+      <div className="form-group">
+        <label className="form-label">Date de retour prévue *</label>
+        <input className="form-input" type="date" value={form.dateRetourPrevue} onChange={e=>set('dateRetourPrevue',e.target.value)} />
+      </div>
+      <div className="form-actions">
+        <button className="btn btn-outline" onClick={onCancel}>Annuler</button>
+        <button className="btn btn-primary" onClick={()=>valid&&onSave(form)} disabled={!valid||avail.length===0} style={{opacity:valid&&avail.length>0?1:0.5}}>
+          📤 Enregistrer l'emprunt
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── BOOK DETAIL ──────────────────────────────────────────────
+function BookDetail({serie,emprunts,enseignants,onClose,onEdit,onBorrow,onReturn,onDelete}) {
+  const ae=emprunts.find(e=>e.serieId===serie.id&&e.statut!=='rendu');
+  const hist=emprunts.filter(e=>e.serieId===serie.id&&e.statut==='rendu');
+  const ens=ae?enseignants.find(e=>e.id===ae.enseignantId):null;
+  return (
+    <Modal title={serie.titre} onClose={onClose} lg>
+      <div className="detail-grid">
+        <div>
+          <div className="detail-cover">
+            {serie.couverture?<img src={serie.couverture} alt={serie.titre} onError={e=>e.target.style.display='none'}/>:<span>{coverEmoji(serie.id)}</span>}
+          </div>
+          <div style={{marginTop:14,display:'flex',flexDirection:'column',gap:8}}>
+            <span className={`badge ${cycleBadgeClass(serie.cycle)}`} style={{borderRadius:8}}>{CYCLE_EMOJI[serie.cycle]} {serie.cycle}</span>
+            {serie.niveaux.map(n=><span key={n} className="badge badge-gray" style={{borderRadius:8}}>{n}</span>)}
+            <span className={`badge ${serie.disponible?'badge-green':'badge-red'}`} style={{borderRadius:8}}>{serie.disponible?'✅ Disponible':'🔴 Emprunté'}</span>
+          </div>
+        </div>
+        <div>
+          <div style={{marginBottom:12}}><div style={{fontSize:11,color:'var(--text-secondary)',fontWeight:700,marginBottom:2}}>AUTEUR</div><div style={{fontSize:15,fontWeight:700}}>{serie.auteur}</div></div>
+          {serie.isbn&&<div style={{marginBottom:12}}><div style={{fontSize:11,color:'var(--text-secondary)',fontWeight:700,marginBottom:2}}>ISBN</div><div style={{fontSize:13,fontFamily:'monospace'}}>{serie.isbn}</div></div>}
+          <div style={{marginBottom:12}}><div style={{fontSize:11,color:'var(--text-secondary)',fontWeight:700,marginBottom:2}}>EXEMPLAIRES</div><div style={{fontSize:15,fontWeight:700}}>📦 {serie.exemplaires}</div></div>
+          {serie.lieu&&<div style={{marginBottom:12}}><div style={{fontSize:11,color:'var(--text-secondary)',fontWeight:700,marginBottom:2}}>LIEU DE RANGEMENT</div><div style={{fontSize:14,fontWeight:700,color:'var(--primary-dark)'}}>📍 {serie.lieu}</div></div>}
+          {ae&&<div className="alert alert-warning" style={{marginBottom:12}}><div><div style={{fontWeight:800}}>👤 Emprunté par {ens?.nom||'Inconnu'}</div><div style={{fontSize:12,marginTop:3}}>Retour prévu le {formatDate(ae.dateRetourPrevue)}{isLate(ae.dateRetourPrevue)&&<span style={{color:'var(--red)',fontWeight:800}}> ⚠️ EN RETARD</span>}</div></div></div>}
+          {serie.notes&&<div style={{padding:'10px 12px',background:'var(--bg)',borderRadius:10,marginBottom:12}}><div style={{fontSize:11,color:'var(--text-secondary)',fontWeight:700,marginBottom:3}}>📝 NOTES</div><div style={{fontSize:13}}>{serie.notes}</div></div>}
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:14}}>
+            {serie.disponible?<button className="btn btn-primary" onClick={onBorrow}>📤 Emprunter</button>:<button className="btn btn-secondary" onClick={onReturn}>📥 Retourner</button>}
+            <button className="btn btn-outline" onClick={onEdit}>✏️ Modifier</button>
+            <button className="btn btn-danger" onClick={onDelete}>🗑️ Supprimer</button>
+          </div>
+          {hist.length>0&&<div style={{marginTop:18,paddingTop:14,borderTop:'1px solid var(--border)'}}><div style={{fontSize:12,fontWeight:800,color:'var(--text-secondary)',marginBottom:8}}>HISTORIQUE</div>{hist.slice(0,5).map(h=>{const e=enseignants.find(x=>x.id===h.enseignantId);return(<div key={h.id} className="history-item"><div className="history-dot" style={{background:'var(--green)'}}/><div style={{flex:1,fontSize:13}}><span style={{fontWeight:700}}>{e?.nom||'Inconnu'}</span><span style={{color:'var(--text-secondary)'}}> · Rendu le {formatDate(h.dateRetourReelle)}</span></div></div>);})}</div>}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ─── PAGE SÉRIES ──────────────────────────────────────────────
+function PageSeries({series,emprunts,enseignants,onAddSerie,onEditSerie,onDeleteSerie,onBorrow,onReturn,toast}) {
+  const [search,setSearch]=useState('');
+  const [filterCycle,setFilterCycle]=useState('');
+  const [filterDispo,setFilterDispo]=useState('');
+  const [showAdd,setShowAdd]=useState(false);
+  const [editing,setEditing]=useState(null);
+  const [detail,setDetail]=useState(null);
+  const [borrowTarget,setBorrowTarget]=useState(null);
+
+  const filtered=useMemo(()=>series.filter(s=>{
+    const q=search.toLowerCase();
+    if(q&&!s.titre.toLowerCase().includes(q)&&!s.auteur.toLowerCase().includes(q))return false;
+    if(filterCycle&&s.cycle!==filterCycle)return false;
+    if(filterDispo==='dispo'&&!s.disponible)return false;
+    if(filterDispo==='emprunte'&&s.disponible)return false;
+    return true;
+  }),[series,search,filterCycle,filterDispo]);
+
+  const handleSave=data=>{if(editing){onEditSerie({...editing,...data});setEditing(null);toast('success','Série modifiée !');}else{onAddSerie(data);setShowAdd(false);toast('success','Série ajoutée !');}};
+  const handleDelete=(id,fromDetail=false)=>{if(window.confirm('Supprimer cette série ?')){onDeleteSerie(id);toast('success','Série supprimée');if(fromDetail)setDetail(null);}};
+
+  return (
+    <div>
+      <div className="page-header">
+        <div><div className="page-title">📚 Séries de livres</div><div className="page-subtitle">{series.length} séries · {series.filter(s=>s.disponible).length} disponibles</div></div>
+        <button className="btn btn-primary" onClick={()=>{setEditing(null);setShowAdd(true);}}>➕ Ajouter une série</button>
+      </div>
+      <div style={{display:'flex',gap:12,marginBottom:16,flexWrap:'wrap',alignItems:'center'}}>
+        <div className="search-input-wrap" style={{flex:1,minWidth:200}}>
+          <span className="search-icon">🔍</span>
+          <input className="search-input" placeholder="Rechercher par titre ou auteur..." value={search} onChange={e=>setSearch(e.target.value)} />
+        </div>
+      </div>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:20}}>
+        <button className={`filter-chip${filterDispo===''?' active':''}`} onClick={()=>setFilterDispo('')}>Tout</button>
+        <button className={`filter-chip${filterDispo==='dispo'?' active-green':''}`} onClick={()=>setFilterDispo('dispo')}>✅ Disponibles</button>
+        <button className={`filter-chip${filterDispo==='emprunte'?' active-red':''}`} onClick={()=>setFilterDispo('emprunte')}>🔴 Empruntés</button>
+        <div style={{width:1,background:'var(--border)',margin:'0 4px'}}/>
+        <button className={`filter-chip${filterCycle===''?' active':''}`} onClick={()=>setFilterCycle('')}>Tous cycles</button>
+        {CYCLES.map(c=><button key={c} className={`filter-chip${filterCycle===c?' active':''}`} onClick={()=>setFilterCycle(c)}>{CYCLE_EMOJI[c]} {c}</button>)}
+      </div>
+      {filtered.length===0
+        ?<div className="empty-state"><div className="empty-icon">📭</div><h3>Aucune série trouvée</h3><p>Modifiez vos filtres ou ajoutez une série.</p></div>
+        :<div className="books-grid">{filtered.map(s=>{
+          const ae=emprunts.find(e=>e.serieId===s.id&&e.statut!=='rendu');
+          const ens=ae?enseignants.find(e=>e.id===ae.enseignantId):null;
+          const late=ae&&isLate(ae.dateRetourPrevue);
+          return (
+            <div key={s.id} className="book-card" onClick={()=>setDetail(s)}>
+              <div className="book-cover">
+                {s.couverture?<img src={s.couverture} alt={s.titre} onError={e=>{e.target.style.display='none';}} />:<span>{coverEmoji(s.id)}</span>}
+                <div className="book-cover-overlay">{late?<span className="badge badge-red">⚠️ Retard</span>:<span className={`badge ${s.disponible?'badge-green':'badge-red'}`}>{s.disponible?'✅':'🔴'}</span>}</div>
+                <div className="book-cover-delete"><button className="delete-btn-card" title="Supprimer" onClick={e=>{e.stopPropagation();handleDelete(s.id);}}>🗑️</button></div>
+              </div>
+              <div className="book-body">
+                <div className="book-title">{s.titre}</div>
+                <div className="book-author">✍️ {s.auteur}</div>
+                {s.lieu&&<div className="book-lieu">📍 {s.lieu}</div>}
+                <div className="book-meta">
+                  <span className={`badge ${cycleBadgeClass(s.cycle)}`}>{CYCLE_EMOJI[s.cycle]} {s.cycle}</span>
+                  {s.niveaux.slice(0,2).map(n=><span key={n} className="badge badge-gray">{n}</span>)}
+                </div>
+                {ens&&<div style={{fontSize:12,color:'var(--text-secondary)',display:'flex',alignItems:'center',gap:5,marginBottom:8}}><div style={{width:18,height:18,borderRadius:'50%',background:ens.couleur,display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,color:'white',fontWeight:800}}>{initials(ens.nom)}</div>{ens.nom}</div>}
+                <div className="book-footer">
+                  <span className="book-exemplaires">📦 {s.exemplaires} ex.</span>
+                  <div style={{marginLeft:'auto',display:'flex',gap:6}}>
+                    <button className="btn btn-outline btn-sm" onClick={e=>{e.stopPropagation();setEditing(s);}} title="Modifier">✏️</button>
+                    {s.disponible
+                      ?<button className="btn btn-primary btn-sm" onClick={e=>{e.stopPropagation();setBorrowTarget(s.id);}}>📤 Emprunter</button>
+                      :<button className="btn btn-secondary btn-sm" onClick={e=>{e.stopPropagation();onReturn(ae.id);toast('success','Série retournée !');}}>📥 Retour</button>
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}</div>
+      }
+      {(showAdd||editing)&&<Modal title={editing?'✏️ Modifier la série':'➕ Ajouter une série'} onClose={()=>{setShowAdd(false);setEditing(null);}} lg><FormSerie init={editing} onSave={handleSave} onCancel={()=>{setShowAdd(false);setEditing(null);}}/></Modal>}
+      {detail&&<BookDetail serie={detail} emprunts={emprunts} enseignants={enseignants} onClose={()=>setDetail(null)} onEdit={()=>{setEditing(detail);setDetail(null);}} onBorrow={()=>{setBorrowTarget(detail.id);setDetail(null);}} onReturn={()=>{const ae=emprunts.find(e=>e.serieId===detail.id&&e.statut!=='rendu');if(ae){onReturn(ae.id);toast('success','Série retournée !');setDetail(null);}}} onDelete={()=>handleDelete(detail.id,true)}/>}
+      {borrowTarget&&<Modal title="📤 Emprunter une série" onClose={()=>setBorrowTarget(null)}><FormEmprunt series={series} enseignants={enseignants} initSerieId={borrowTarget} onSave={data=>{onBorrow(data);setBorrowTarget(null);toast('success','Emprunt enregistré !');}} onCancel={()=>setBorrowTarget(null)}/></Modal>}
+    </div>
+  );
+}
+
+// ─── PAGE EMPRUNTS ────────────────────────────────────────────
+function PageEmprunts({emprunts,series,enseignants,onBorrow,onReturn,toast}) {
+  const [tab,setTab]=useState('actifs');
+  const [showAdd,setShowAdd]=useState(false);
+  const actifs=emprunts.filter(e=>e.statut!=='rendu').sort((a,b)=>isLate(b.dateRetourPrevue)-isLate(a.dateRetourPrevue));
+  const hist=emprunts.filter(e=>e.statut==='rendu').sort((a,b)=>new Date(b.dateRetourReelle)-new Date(a.dateRetourReelle));
+  const retards=actifs.filter(e=>isLate(e.dateRetourPrevue));
+  const list=tab==='actifs'?actifs:hist;
+  const getSerie=id=>series.find(s=>s.id===id);
+  const getEns=id=>enseignants.find(e=>e.id===id);
+  return (
+    <div>
+      <div className="page-header">
+        <div><div className="page-title">📋 Emprunts</div><div className="page-subtitle">{actifs.length} en cours · {retards.length} en retard</div></div>
+        <button className="btn btn-primary" onClick={()=>setShowAdd(true)}>📤 Emprunter une série</button>
+      </div>
+      {retards.length>0&&<div className="alert alert-warning">⚠️ <strong>{retards.length} emprunt{retards.length>1?'s':''} en retard</strong> — relancez les enseignants concernés.</div>}
+      <div className="tabs">
+        <div className={`tab${tab==='actifs'?' active':''}`} onClick={()=>setTab('actifs')}>En cours ({actifs.length})</div>
+        <div className={`tab${tab==='historique'?' active':''}`} onClick={()=>setTab('historique')}>Historique ({hist.length})</div>
+      </div>
+      {list.length===0
+        ?<div className="empty-state"><div className="empty-icon">{tab==='actifs'?'🎉':'📭'}</div><h3>{tab==='actifs'?'Aucun emprunt en cours !':'Aucun historique'}</h3></div>
+        :<div className="card" style={{padding:0,overflow:'hidden'}}><div className="table-wrap"><table className="data-table"><thead><tr><th>Série</th><th>Lieu</th><th>Enseignant</th><th>Retour prévu</th>{tab==='historique'&&<th>Retourné le</th>}<th>Statut</th>{tab==='actifs'&&<th>Action</th>}</tr></thead><tbody>
+          {list.map(e=>{
+            const s=getSerie(e.serieId),ens=getEns(e.enseignantId),late=e.statut!=='rendu'&&isLate(e.dateRetourPrevue);
+            return <tr key={e.id}>
+              <td><div style={{fontWeight:700}}>{s?.titre||'Inconnu'}</div><div style={{fontSize:12,color:'var(--text-secondary)'}}>{s?.cycle}</div></td>
+              <td><div style={{fontSize:12,color:'var(--primary-dark)',fontWeight:600}}>{s?.lieu?`📍 ${s.lieu}`:'—'}</div></td>
+              <td><div style={{display:'flex',alignItems:'center',gap:8}}><div style={{width:28,height:28,borderRadius:'50%',background:ens?.couleur||'#ccc',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'white',fontWeight:800,flexShrink:0}}>{initials(ens?.nom||'?')}</div><div><div style={{fontWeight:700,fontSize:13}}>{ens?.nom||'Inconnu'}</div>{ens?.classe&&<div style={{fontSize:11,color:'var(--text-secondary)'}}>{ens.classe}</div>}</div></div></td>
+              <td><span style={{color:late?'var(--red)':'inherit',fontWeight:late?800:600}}>{formatDate(e.dateRetourPrevue)}</span></td>
+              {tab==='historique'&&<td>{formatDate(e.dateRetourReelle)}</td>}
+              <td>{late?<span className="badge badge-red">⚠️ Retard</span>:e.statut==='rendu'?<span className="badge badge-green">✅ Rendu</span>:<span className="badge badge-amber">📤 En cours</span>}</td>
+              {tab==='actifs'&&<td><button className="btn btn-outline btn-sm" onClick={()=>{onReturn(e.id);toast('success','Série retournée !');}}>📥 Retourner</button></td>}
+            </tr>;
+          })}
+        </tbody></table></div></div>
+      }
+      {showAdd&&<Modal title="📤 Emprunter une série" onClose={()=>setShowAdd(false)}><FormEmprunt series={series} enseignants={enseignants} onSave={data=>{onBorrow(data);setShowAdd(false);toast('success','Emprunt enregistré !');}} onCancel={()=>setShowAdd(false)}/></Modal>}
+    </div>
+  );
+}
+
+// ─── PAGE ENSEIGNANTS ─────────────────────────────────────────
+function PageEnseignants({enseignants,emprunts,series,onAddEns,onEditEns,onDeleteEns,toast}) {
+  const [showAdd,setShowAdd]=useState(false);
+  const [editing,setEditing]=useState(null);
+  const [detail,setDetail]=useState(null);
+  const [form,setForm]=useState({nom:'',classe:''});
+  const getActifs=id=>emprunts.filter(e=>e.enseignantId===id&&e.statut!=='rendu');
+  const getHist=id=>emprunts.filter(e=>e.enseignantId===id&&e.statut==='rendu');
+  const handleSave=()=>{if(!form.nom.trim())return;if(editing){onEditEns({...editing,...form});setEditing(null);toast('success','Modifié !');}else{onAddEns({...form,couleur:COLORS_TEACHER[enseignants.length%COLORS_TEACHER.length]});toast('success','Enseignant ajouté !');}setShowAdd(false);setForm({nom:'',classe:''});};
+  return (
+    <div>
+      <div className="page-header">
+        <div><div className="page-title">👩‍🏫 Enseignants</div><div className="page-subtitle">{enseignants.length} enseignants</div></div>
+        <button className="btn btn-primary" onClick={()=>{setEditing(null);setForm({nom:'',classe:''});setShowAdd(true);}}>➕ Ajouter</button>
+      </div>
+      {enseignants.length===0?<div className="empty-state"><div className="empty-icon">👩‍🏫</div><h3>Aucun enseignant</h3></div>
+        :<div className="teachers-grid">{enseignants.map(e=>{
+          const actifs=getActifs(e.id),hist=getHist(e.id);
+          return <div key={e.id} className="teacher-card">
+            <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:14}}>
+              <div style={{display:'flex',alignItems:'center',gap:12}}>
+                <div className="teacher-avatar" style={{background:e.couleur}}>{initials(e.nom)}</div>
+                <div><div className="teacher-name">{e.nom}</div><div className="teacher-meta">{e.classe?`Classe : ${e.classe}`:'Sans classe'}</div></div>
+              </div>
+              <div style={{display:'flex',gap:4}}>
+                <button className="btn btn-outline btn-icon btn-sm" onClick={()=>{setEditing(e);setForm({nom:e.nom,classe:e.classe||''});setShowAdd(true);}}>✏️</button>
+                <button className="btn btn-outline btn-icon btn-sm" onClick={()=>{if(window.confirm('Supprimer ?')){onDeleteEns(e.id);toast('success','Supprimé');}}}>🗑️</button>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:8,marginBottom:12}}>
+              <span className={`badge ${actifs.length>0?'badge-amber':'badge-green'}`}>{actifs.length>0?`📤 ${actifs.length} emprunt${actifs.length>1?'s':''}`:'✅ Aucun emprunt'}</span>
+              <span className="badge badge-blue">📋 {hist.length} rendu{hist.length>1?'s':''}</span>
+            </div>
+            {actifs.length>0&&actifs.map(emp=>{const s=series.find(x=>x.id===emp.serieId),late=isLate(emp.dateRetourPrevue);return <div key={emp.id} className="teacher-book-item"><span>{coverEmoji(emp.serieId)}</span><div style={{flex:1}}><div style={{fontWeight:700,fontSize:12}}>{s?.titre||'Inconnu'}</div><div style={{fontSize:11,color:late?'var(--red)':'var(--text-secondary)'}}>{late?'⚠️ En retard':`Retour : ${formatDate(emp.dateRetourPrevue)}`}</div></div></div>;})}
+            {hist.length>0&&<button className="btn btn-outline btn-sm" style={{marginTop:12,width:'100%'}} onClick={()=>setDetail(detail?.id===e.id?null:e)}>{detail?.id===e.id?'▲ Masquer':`📋 Historique (${hist.length})`}</button>}
+            {detail?.id===e.id&&<div style={{marginTop:12,paddingTop:12,borderTop:'1px solid var(--border)'}}>{hist.slice(0,5).map(h=>{const s=series.find(x=>x.id===h.serieId);return<div key={h.id} className="history-item"><div className="history-dot" style={{background:'var(--green)'}}/><div style={{flex:1,fontSize:12}}><span style={{fontWeight:700}}>{s?.titre||'?'}</span><span style={{color:'var(--text-secondary)'}}> · {formatDate(h.dateRetourReelle)}</span></div></div>; })}</div>}
+          </div>;
+        })}</div>
+      }
+      {showAdd&&<Modal title={editing?'✏️ Modifier':'➕ Ajouter un enseignant'} onClose={()=>{setShowAdd(false);setEditing(null);}}>
+        <div className="form-group"><label className="form-label">Nom complet *</label><input className="form-input" value={form.nom} onChange={e=>setForm(f=>({...f,nom:e.target.value}))} placeholder="Ex : Marie Dupont" /></div>
+        <div className="form-group"><label className="form-label">Classe (optionnel)</label><input className="form-input" value={form.classe} onChange={e=>setForm(f=>({...f,classe:e.target.value}))} placeholder="Ex : CE2, CM1..." /></div>
+        <div className="form-actions"><button className="btn btn-outline" onClick={()=>{setShowAdd(false);setEditing(null);}}>Annuler</button><button className="btn btn-primary" onClick={handleSave} disabled={!form.nom.trim()} style={{opacity:form.nom.trim()?1:0.5}}>💾 Enregistrer</button></div>
+      </Modal>}
+    </div>
+  );
+}
+
+// ─── PAGE STATS ───────────────────────────────────────────────
+function PageStats({series,emprunts,enseignants}) {
+  const total=emprunts.length,actifs=emprunts.filter(e=>e.statut!=='rendu').length,retards=emprunts.filter(e=>e.statut!=='rendu'&&isLate(e.dateRetourPrevue)).length,dispo=series.filter(s=>s.disponible).length;
+  const byS=series.map(s=>({...s,count:emprunts.filter(e=>e.serieId===s.id).length})).sort((a,b)=>b.count-a.count).slice(0,8);
+  const maxC=byS[0]?.count||1;
+  const byE=enseignants.map(e=>({...e,count:emprunts.filter(x=>x.enseignantId===e.id).length})).sort((a,b)=>b.count-a.count);
+  const byCy=CYCLES.map(c=>({cycle:c,count:series.filter(s=>s.cycle===c).length,nb:emprunts.filter(e=>{const s=series.find(x=>x.id===e.serieId);return s?.cycle===c;}).length}));
+  return (
+    <div>
+      <div className="page-header"><div><div className="page-title">📊 Statistiques</div></div></div>
+      <div className="stats-grid">
+        {[['📚','var(--primary-light)','var(--primary)',series.length,'Séries'],['✅','var(--green-light)','var(--green)',dispo,'Disponibles'],['📤','var(--amber-light)','var(--amber)',actifs,'Emprunts actifs'],['⚠️','var(--red-light)','var(--red)',retards,'En retard'],['📋','var(--purple-light)','var(--purple)',total,'Total emprunts'],['👩‍🏫','var(--secondary-light)','var(--secondary)',enseignants.length,'Enseignants']].map(([i,bg,c,v,l])=>(
+          <div key={l} className="stat-card"><div className="stat-icon" style={{background:bg}}>{i}</div><div className="stat-number" style={{color:c}}>{v}</div><div className="stat-label">{l}</div></div>
+        ))}
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:24,marginBottom:24}}>
+        <div className="card">
+          <div style={{fontWeight:800,fontSize:16,marginBottom:20,fontFamily:'var(--font-display)'}}>📈 Séries les plus empruntées</div>
+          {byS.length===0?<div style={{color:'var(--text-secondary)'}}>Aucun emprunt encore.</div>
+            :<div className="bar-chart">{byS.map(s=><div key={s.id} className="bar-row"><div className="bar-label" title={s.titre}>{s.titre.length>18?s.titre.slice(0,16)+'…':s.titre}</div><div className="bar-track"><div className="bar-fill" style={{width:`${(s.count/maxC)*100}%`,background:s.cycle==='Cycle 1'?'var(--primary)':s.cycle==='Cycle 2'?'var(--secondary)':'#9B6BF2'}}>{s.count>0&&s.count}</div></div><div className="bar-count">{s.count}</div></div>)}</div>
+          }
+        </div>
+        <div className="card">
+          <div style={{fontWeight:800,fontSize:16,marginBottom:20,fontFamily:'var(--font-display)'}}>👩‍🏫 Enseignants actifs</div>
+          {byE.map(e=><div key={e.id} style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}><div style={{width:34,height:34,borderRadius:'50%',background:e.couleur,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,color:'white',fontWeight:800,flexShrink:0}}>{initials(e.nom)}</div><div style={{flex:1}}><div style={{fontSize:14,fontWeight:700}}>{e.nom}</div><div style={{fontSize:12,color:'var(--text-secondary)'}}>{e.count} emprunt{e.count>1?'s':''}</div></div></div>)}
+        </div>
+      </div>
+      <div className="card">
+        <div style={{fontWeight:800,fontSize:16,marginBottom:20,fontFamily:'var(--font-display)'}}>🎓 Répartition par cycle</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:16}}>
+          {byCy.map(c=><div key={c.cycle} style={{padding:20,background:'var(--bg)',borderRadius:'var(--radius-sm)',textAlign:'center'}}><div style={{fontSize:32,marginBottom:8}}>{CYCLE_EMOJI[c.cycle]}</div><div style={{fontWeight:800,fontSize:16,marginBottom:4}}>{c.cycle}</div><div style={{fontSize:24,fontWeight:900,color:'var(--primary)',fontFamily:'var(--font-display)'}}>{c.count}</div><div style={{fontSize:12,color:'var(--text-secondary)'}}>séries</div><div style={{fontSize:13,fontWeight:700,color:'var(--secondary)',marginTop:4}}>{c.nb} emprunt{c.nb>1?'s':''}</div></div>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── PAGE ADMIN ───────────────────────────────────────────────
+const _ADMIN_H = _h('abcd1234');
+function PageAdmin({series,emprunts,enseignants,onReset,toast,isAdmin,setIsAdmin,themeColors,onThemeChange}) {
+  const [pwd,setPwd]=useState('');
+  const [showPwd,setShowPwd]=useState(false);
+  const [err,setErr]=useState('');
+
+  const handleLogin=()=>{
+    if(_h(pwd)===_ADMIN_H){setIsAdmin(true);setPwd('');setErr('');toast('success','Accès administrateur activé !');}
+    else{setErr('Mot de passe incorrect.');setTimeout(()=>setErr(''),2500);}
+  };
+
+  if(!isAdmin) return (
+    <div>
+      <div className="page-header"><div><div className="page-title">🔐 Administration</div><div className="page-subtitle">Accès protégé</div></div></div>
+      <div className="card" style={{maxWidth:380,margin:'0 auto'}}>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:20,padding:'16px 0'}}>
+          <div style={{fontSize:44}}>🔐</div>
+          <div style={{fontWeight:800,fontSize:20}}>Espace administrateur</div>
+          <div style={{fontSize:13,color:'var(--text-secondary)',textAlign:'center'}}>Entrez le mot de passe pour accéder aux paramètres.</div>
+          <div style={{width:'100%',position:'relative'}}>
+            <input className="form-input" type={showPwd?'text':'password'} value={pwd} onChange={e=>setPwd(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleLogin()} placeholder="Mot de passe administrateur" style={{paddingRight:48}} autoComplete="off" />
+            <button onClick={()=>setShowPwd(v=>!v)} style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:18,color:'var(--text-secondary)'}}>{showPwd?'🙈':'👁️'}</button>
+          </div>
+          {err&&<div style={{color:'var(--red)',fontSize:13,fontWeight:700,background:'var(--red-light)',padding:'8px 14px',borderRadius:8,width:'100%',textAlign:'center'}}>❌ {err}</div>}
+          <button className="btn btn-primary" style={{width:'100%',justifyContent:'center'}} onClick={handleLogin} disabled={!pwd.trim()}>🔓 Connexion</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const PRESETS=[
+    {name:'🌿 Vert (défaut)',primary:'#2BBF7A',secondary:'#F97B5A',btnText:'#ffffff',text:'#1A2E24',bg:'#F4FBF7'},
+    {name:'💙 Bleu océan',primary:'#3B82F6',secondary:'#F59E0B',btnText:'#ffffff',text:'#1E3A5F',bg:'#EFF6FF'},
+    {name:'🟣 Violet',primary:'#8B5CF6',secondary:'#EC4899',btnText:'#ffffff',text:'#2D1B69',bg:'#F5F3FF'},
+    {name:'🔴 Rouge vif',primary:'#EF4444',secondary:'#F97316',btnText:'#ffffff',text:'#2D0A0A',bg:'#FFF5F5'},
+    {name:'🌸 Rose',primary:'#EC4899',secondary:'#8B5CF6',btnText:'#ffffff',text:'#4A1040',bg:'#FDF2F8'},
+    {name:'🌑 Sombre',primary:'#6EE7B7',secondary:'#FCA5A5',btnText:'#0F1F17',text:'#E8F5EE',bg:'#0F1F17'},
+  ];
+  const THEME_FIELDS=[
+    {key:'primary',label:'🎨 Couleur principale',desc:'Boutons, liens actifs, accents'},
+    {key:'secondary',label:'🟠 Couleur secondaire',desc:'Bouton retour, badges secondaires'},
+    {key:'btnText',label:'🔤 Texte des boutons',desc:'Texte sur les boutons principaux'},
+    {key:'text',label:'🖊️ Couleur du texte',desc:'Texte principal du site'},
+    {key:'bg',label:'🖼️ Couleur de fond',desc:'Arrière-plan général'},
+  ];
+
+  const exportJSON=()=>{const d={series,emprunts,enseignants,exportDate:new Date().toISOString()};const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='bibliotheque-export.json';a.click();toast('success','Export téléchargé !');};
+  const exportCSV=()=>{const rows=[['Titre','Auteur','ISBN','Cycle','Exemplaires','Disponible','Niveaux','Lieu','Notes']];series.forEach(s=>rows.push([s.titre,s.auteur,s.isbn||'',s.cycle,s.exemplaires,s.disponible?'Oui':'Non',s.niveaux.join(' '),s.lieu||'',s.notes]));const csv=rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');const b=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='series-livres.csv';a.click();toast('success','CSV téléchargé !');};
+
+  return (
+    <div>
+      <div className="page-header">
+        <div><div className="page-title">⚙️ Administration</div><div className="page-subtitle">Paramètres de BiblioPrim</div></div>
+        <button className="btn btn-outline" onClick={()=>{setIsAdmin(false);toast('success','Déconnecté');}}>🔒 Se déconnecter</button>
+      </div>
+
+      {/* THEME SECTION */}
+      <div className="card" style={{marginBottom:24,borderColor:'var(--primary)',borderWidth:2}}>
+        <div style={{fontWeight:800,fontSize:18,marginBottom:4,fontFamily:'var(--font-display)',color:'var(--primary)'}}>🎨 Personnalisation du thème</div>
+        <div style={{fontSize:13,color:'var(--text-secondary)',marginBottom:20}}>Les modifications s'appliquent instantanément et sont sauvegardées automatiquement.</div>
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:12,fontWeight:800,color:'var(--text-secondary)',letterSpacing:'.8px',marginBottom:10}}>THÈMES PRÉDÉFINIS</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            {PRESETS.map(p=><button key={p.name} onClick={()=>{onThemeChange({primary:p.primary,secondary:p.secondary,btnText:p.btnText,text:p.text,bg:p.bg});toast('success',`Thème appliqué !`);}} style={{padding:'8px 14px',borderRadius:20,border:'2px solid var(--border)',background:'var(--bg)',cursor:'pointer',fontSize:13,fontWeight:700,color:'var(--text)',transition:'all .2s',display:'flex',alignItems:'center',gap:6}}>
+              <span style={{width:14,height:14,borderRadius:'50%',background:p.primary,display:'inline-block',flexShrink:0}}/>{p.name}
+            </button>)}
+          </div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:16}}>
+          {THEME_FIELDS.map(f=><div key={f.key} style={{padding:'14px 16px',background:'var(--bg)',borderRadius:'var(--radius-sm)',border:'1px solid var(--border)'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+              <div><div style={{fontWeight:700,fontSize:14}}>{f.label}</div><div style={{fontSize:11,color:'var(--text-secondary)'}}>{f.desc}</div></div>
+              <input type="color" value={themeColors[f.key]} onChange={e=>onThemeChange({[f.key]:e.target.value})} style={{width:48,height:48,borderRadius:12,border:'2px solid var(--border)',padding:3,background:'var(--bg-card)',cursor:'pointer'}}/>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <div style={{width:24,height:24,borderRadius:6,background:themeColors[f.key],border:'1px solid var(--border)',flexShrink:0}}/>
+              <input className="form-input" value={themeColors[f.key]} onChange={e=>{if(/^#[0-9A-Fa-f]{0,6}$/.test(e.target.value))onThemeChange({[f.key]:e.target.value});}} style={{padding:'6px 10px',fontSize:13,fontFamily:'monospace',flex:1}} placeholder="#000000"/>
+            </div>
+          </div>)}
+        </div>
+        <div style={{marginTop:16}}>
+          <button className="btn btn-outline btn-sm" onClick={()=>{onThemeChange(DEFAULT_THEME);toast('success','Thème réinitialisé !');}}>🔄 Réinitialiser le thème</button>
+        </div>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:24}}>
+        <div className="card">
+          <div style={{fontWeight:800,fontSize:16,marginBottom:16}}>📊 Résumé</div>
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            {[['📚','Séries',series.length],['📋','Emprunts',emprunts.length],['📤','Actifs',emprunts.filter(e=>e.statut!=='rendu').length],['⚠️','Retards',emprunts.filter(e=>e.statut!=='rendu'&&isLate(e.dateRetourPrevue)).length],['👩‍🏫','Enseignants',enseignants.length]].map(([i,l,v])=>(
+              <div key={l} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:'var(--bg)',borderRadius:'var(--radius-sm)'}}><span style={{fontSize:18}}>{i}</span><span style={{flex:1,fontWeight:600,fontSize:14}}>{l}</span><span style={{fontWeight:900,fontSize:18,color:'var(--primary)',fontFamily:'var(--font-display)'}}>{v}</span></div>
+            ))}
+          </div>
+        </div>
+        <div className="card">
+          <div style={{fontWeight:800,fontSize:16,marginBottom:16}}>💾 Export des données</div>
+          <p style={{fontSize:13,color:'var(--text-secondary)',marginBottom:16}}>Sauvegardez toutes vos données.</p>
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            <button className="btn btn-primary" onClick={exportJSON} style={{justifyContent:'center'}}>💾 Exporter en JSON</button>
+            <button className="btn btn-outline" onClick={exportCSV} style={{justifyContent:'center'}}>📋 Exporter en CSV (Excel)</button>
+          </div>
+        </div>
+        <div className="card" style={{borderColor:'var(--red)',borderWidth:2}}>
+          <div style={{fontWeight:800,fontSize:16,marginBottom:8,color:'var(--red)'}}>⚠️ Zone de danger</div>
+          <p style={{fontSize:13,color:'var(--text-secondary)',marginBottom:16}}>Action irréversible.</p>
+          <button className="btn btn-danger" onClick={()=>{if(window.confirm('⚠️ Supprimer TOUTES les données ?')){onReset();toast('warning','Données réinitialisées');}}}>🗑️ Réinitialiser</button>
+        </div>
+        <div className="card">
+          <div style={{fontWeight:800,fontSize:16,marginBottom:8}}>📱 Scan de code-barres</div>
+          <p style={{fontSize:13,color:'var(--text-secondary)'}}>Pour scanner un code-barres, cliquez sur <strong>➕ Ajouter une série</strong> depuis la page Séries. La section de recherche ISBN apparaît en haut du formulaire, avec deux options :</p>
+          <ul style={{fontSize:13,color:'var(--text-secondary)',marginTop:8,paddingLeft:20,lineHeight:2}}>
+            <li><strong>🔍 Chercher</strong> — entrez l'ISBN manuellement</li>
+            <li><strong>📷 Scanner</strong> — utilisez la caméra (autorisez l'accès)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── APP ──────────────────────────────────────────────────────
+function App() {
+  const [series,setSeries]=useLocalStorage('bib_series',SAMPLE_SERIES);
+  const [enseignants,setEnseignants]=useLocalStorage('bib_enseignants',SAMPLE_ENSEIGNANTS);
+  const [emprunts,setEmprunts]=useLocalStorage('bib_emprunts',SAMPLE_EMPRUNTS);
+  const [page,setPage]=useState('series');
+  const [theme,setTheme]=useLocalStorage('bib_theme','light');
+  const [themeColors,setThemeColors]=useLocalStorage('bib_theme_colors',DEFAULT_THEME);
+  const [toasts,setToasts]=useState([]);
+  const [isAdmin,setIsAdmin]=useState(false);
+
+  useEffect(()=>{ document.documentElement.setAttribute('data-theme',theme); },[theme]);
+  useEffect(()=>{ applyTheme(themeColors); },[themeColors]);
+
+  const handleThemeChange=useCallback((patch)=>{
+    setThemeColors(prev=>{const next={...prev,...patch};applyTheme(next);return next;});
+  },[]);
+
+  const toast=useCallback((type,msg)=>{const id=uid();setToasts(t=>[...t,{id,type,msg}]);setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),3500);},[]);
+
+  useEffect(()=>{setSeries(prev=>prev.map(s=>({...s,disponible:!emprunts.some(e=>e.serieId===s.id&&e.statut!=='rendu')})));},[emprunts]);
+
+  const addSerie=data=>setSeries(prev=>[...prev,{...data,id:uid(),disponible:true}]);
+  const editSerie=data=>setSeries(prev=>prev.map(s=>s.id===data.id?data:s));
+  const deleteSerie=id=>{setSeries(prev=>prev.filter(s=>s.id!==id));setEmprunts(prev=>prev.filter(e=>e.serieId!==id));};
+  const addEns=data=>setEnseignants(prev=>[...prev,{...data,id:uid()}]);
+  const editEns=data=>setEnseignants(prev=>prev.map(e=>e.id===data.id?data:e));
+  const deleteEns=id=>setEnseignants(prev=>prev.filter(e=>e.id!==id));
+  const addEmprunt=data=>setEmprunts(prev=>[...prev,{...data,id:uid(),dateEmprunt:new Date().toISOString().split('T')[0],dateRetourReelle:null,statut:'actif'}]);
+  const returnEmprunt=id=>setEmprunts(prev=>prev.map(e=>e.id===id?{...e,statut:'rendu',dateRetourReelle:new Date().toISOString().split('T')[0]}:e));
+  const resetAll=()=>{setSeries(SAMPLE_SERIES);setEnseignants(SAMPLE_ENSEIGNANTS);setEmprunts(SAMPLE_EMPRUNTS);};
+
+  const retards=emprunts.filter(e=>e.statut!=='rendu'&&isLate(e.dateRetourPrevue)).length;
+  const actifs=emprunts.filter(e=>e.statut!=='rendu').length;
+  const navItems=[
+    {id:'series',icon:'📚',label:'Séries'},
+    {id:'emprunts',icon:'📋',label:'Emprunts',badge:actifs>0?(retards>0?`${actifs} ⚠️`:actifs):null},
+    {id:'enseignants',icon:'👩‍🏫',label:'Enseignants'},
+    {id:'stats',icon:'📊',label:'Statistiques'},
+    {id:'admin',icon:'⚙️',label:'Admin'},
+  ];
+
+  return (
+    <div className="app-layout">
+      <nav className="topnav">
+        <div className="topnav-logo">
+          <div className="logo-icon">📚</div>
+          <span className="logo-title">BiblioPrim</span>
+        </div>
+        <div className="topnav-items">
+          {navItems.map(item=>(
+            <button key={item.id} className={`nav-item${page===item.id?' active':''}`} onClick={()=>setPage(item.id)}>
+              <span className="nav-icon">{item.icon}</span>
+              <span>{item.label}</span>
+              {item.badge&&<span className="nav-badge">{item.badge}</span>}
+            </button>
+          ))}
+        </div>
+        <div className="topnav-right">
+          <button className="theme-toggle" onClick={()=>setTheme(t=>t==='light'?'dark':'light')}>
+            {theme==='light'?'🌙':'☀️'} {theme==='light'?'Sombre':'Clair'}
+          </button>
+        </div>
+      </nav>
+      <main className="main-content">
+        {page==='series'&&<PageSeries series={series} emprunts={emprunts} enseignants={enseignants} onAddSerie={addSerie} onEditSerie={editSerie} onDeleteSerie={deleteSerie} onBorrow={addEmprunt} onReturn={returnEmprunt} toast={toast}/>}
+        {page==='emprunts'&&<PageEmprunts emprunts={emprunts} series={series} enseignants={enseignants} onBorrow={addEmprunt} onReturn={returnEmprunt} toast={toast}/>}
+        {page==='enseignants'&&<PageEnseignants enseignants={enseignants} emprunts={emprunts} series={series} onAddEns={addEns} onEditEns={editEns} onDeleteEns={deleteEns} toast={toast}/>}
+        {page==='stats'&&<PageStats series={series} emprunts={emprunts} enseignants={enseignants}/>}
+        {page==='admin'&&<PageAdmin series={series} emprunts={emprunts} enseignants={enseignants} onReset={resetAll} toast={toast} isAdmin={isAdmin} setIsAdmin={setIsAdmin} themeColors={themeColors} onThemeChange={handleThemeChange}/>}
+      </main>
+      <ToastContainer toasts={toasts} onDismiss={id=>setToasts(t=>t.filter(x=>x.id!==id))}/>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
